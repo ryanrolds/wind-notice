@@ -1,40 +1,74 @@
 # Fern Ridge Sailing Forecast
 
-7-day weather forecast for Fern Ridge Reservoir (near Eugene, OR), scored for sailing quality.
+7-day weather forecast for Fern Ridge Reservoir (near Eugene, OR), scored for sailing quality. Served as a web page that auto-refreshes on a schedule.
 
-Each day is scored 0–100 based on conditions during sailing hours (8 AM – 7 PM):
+Each day is scored 0–100 based on conditions during sailing hours (11 AM – 5 PM):
 
 | Factor | Weight | Ideal |
 |--------|--------|-------|
-| Wind speed | 40% | 10–15 mph |
+| Wind speed | 35% | 10–15 mph (under 8 or over 17 = dealbreaker) |
 | Gust spread | 20% | < 6 mph spread |
-| Precipitation | 20% | Dry |
-| Temperature | 10% | 75–95°F |
+| Precipitation | 15% | Dry |
+| Cloud cover | 10% | Partly cloudy (30–70%) |
+| Temperature | 10% | 75–95°F (under 70 or over 105 = dealbreaker) |
 | Wind direction | 10% | W/NW (best fetch) |
 
 Ratings: Excellent (80+), Good (65–79), Fair (50–64), Poor (35–49), Unfavorable (<35)
 
-## Setup
+Wind and temperature have hard cutoffs — if either is outside the usable range, the day is capped at Unfavorable regardless of other conditions.
+
+## Local Development
 
 ```bash
 pip install -r requirements.txt
 cp .env.example .env
-# Edit .env with your SMTP credentials
+# Edit .env with your settings
 ```
 
-For Gmail, use an [App Password](https://support.google.com/accounts/answer/185833) (not your regular password).
+Run the web server:
+```bash
+python3 app.py
+# Visit http://localhost:5000
+```
 
-## Usage
-
-Print forecast to terminal:
+Print forecast to terminal (no web server):
 ```bash
 python3 wind_notice.py --no-email
 ```
 
-Send forecast via email:
+Send forecast via email (requires AWS SES credentials):
 ```bash
 python3 wind_notice.py
 ```
+
+## Docker
+
+```bash
+docker compose up --build
+# Visit http://localhost:5000
+```
+
+The forecast refreshes every 6 hours by default (configurable via `REFRESH_INTERVAL_HOURS`).
+
+## Email
+
+Email is sent via AWS SES. Set these environment variables:
+
+- `AWS_REGION` — SES region (e.g., `us-west-2`)
+- `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` — IAM credentials with `ses:SendEmail` permission
+- `EMAIL_FROM` — verified sender address
+- `EMAIL_TO` — recipient address(es), comma-separated
+
+## Deployment
+
+The app deploys to Kubernetes via Helm and ArgoCD:
+
+- Docker image pushed to `zot.pedanticorderliness.com/wind-notice`
+- Helm chart at `infrastructure/charts/wind-notice`
+- ArgoCD syncs from the `app-of-apps` chart
+- Live at `wind.pedanticorderliness.com`
+
+AWS credentials are stored as SOPS-encrypted secrets in the infrastructure repo.
 
 ## Data Source
 

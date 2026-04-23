@@ -3,13 +3,12 @@
 
 import argparse
 import os
-import smtplib
 import sys
 from datetime import datetime
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 
+import boto3
 import requests
+from botocore.exceptions import BotoCoreError, ClientError
 from dotenv import load_dotenv
 
 # Fern Ridge Reservoir coordinates
@@ -393,8 +392,8 @@ def format_report(scored_days):
 
 
 def load_email_config():
-    """Load SMTP config from environment variables. Returns dict or raises."""
-    required = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "EMAIL_FROM", "EMAIL_TO"]
+    """Load email config from environment variables. Returns dict or raises."""
+    required = ["AWS_REGION", "EMAIL_FROM", "EMAIL_TO"]
     config = {}
     missing = []
     for key in required:
@@ -407,34 +406,27 @@ def load_email_config():
     if missing:
         raise ValueError(
             f"Missing email config environment variables: {', '.join(missing)}\n"
-            "Copy .env.example to .env and fill in your SMTP settings."
+            "Set AWS_REGION, EMAIL_FROM, and EMAIL_TO. AWS credentials are loaded\n"
+            "from the standard chain (env vars, ~/.aws, or IAM role)."
         )
 
-    config["SMTP_PORT"] = int(config["SMTP_PORT"])
     return config
 
 
 def send_email(subject, plain, html, config):
-    """Send multipart email via SMTP."""
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = config["EMAIL_FROM"]
-    msg["To"] = config["EMAIL_TO"]
-    msg.attach(MIMEText(plain, "plain"))
-    msg.attach(MIMEText(html, "html"))
-
-    port = config["SMTP_PORT"]
-    if port == 465:
-        server = smtplib.SMTP_SSL(config["SMTP_HOST"], port, timeout=15)
-    else:
-        server = smtplib.SMTP(config["SMTP_HOST"], port, timeout=15)
-        server.starttls()
-
-    try:
-        server.login(config["SMTP_USER"], config["SMTP_PASSWORD"])
-        server.sendmail(config["EMAIL_FROM"], config["EMAIL_TO"].split(","), msg.as_string())
-    finally:
-        server.quit()
+    """Send email via AWS SES."""
+    ses = boto3.client("ses", region_name=config["AWS_REGION"])
+    ses.send_email(
+        Source=config["EMAIL_FROM"],
+        Destination={"ToAddresses": [a.strip() for a in config["EMAIL_TO"].split(",")]},
+        Message={
+            "Subject": {"Charset": "UTF-8", "Data": subject},
+            "Body": {
+                "Text": {"Charset": "UTF-8", "Data": plain},
+                "Html": {"Charset": "UTF-8", "Data": html},
+            },
+        },
+    )
 
 
 def generate_report():
@@ -485,7 +477,7 @@ def main():
     try:
         send_email(subject, plain, html, config)
         print(f"Forecast sent to {config['EMAIL_TO']}")
-    except smtplib.SMTPException as e:
+    except (BotoCoreError, ClientError) as e:
         print(f"Error sending email: {e}", file=sys.stderr)
         sys.exit(1)
 
