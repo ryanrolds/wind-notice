@@ -59,6 +59,17 @@ Email is sent via AWS SES. Set these environment variables:
 - `EMAIL_FROM` — verified sender address
 - `EMAIL_TO` — recipient address(es), comma-separated
 
+## SMS
+
+SMS alerts are sent via AWS SNS when today's sailing score meets the threshold. Set these environment variables:
+
+- `SMS_ENABLED` — `true` to enable (default: `false`)
+- `SMS_CRON` — cron schedule (default: `0 11 * * *` — 11 AM PT)
+- `SMS_TO` — E.164 phone number (e.g., `+15551234567`)
+- `SMS_MIN_SCORE` — minimum score to trigger SMS (default: `65`, i.e. "Good")
+
+The IAM credentials must also have `sns:Publish` permission.
+
 ## Deployment
 
 The app deploys to Kubernetes via Helm and ArgoCD:

@@ -35,8 +35,8 @@ DISPLAY_WINDOWS = [
 WEIGHT_WIND = 0.35
 WEIGHT_GUSTS = 0.20
 WEIGHT_PRECIP = 0.15
-WEIGHT_TEMP = 0.10
-WEIGHT_CLOUD = 0.10
+WEIGHT_TEMP = 0.15
+WEIGHT_CLOUD = 0.05
 WEIGHT_DIRECTION = 0.10
 
 # Rating thresholds
@@ -57,7 +57,7 @@ def fetch_forecast():
         "hourly": "wind_speed_10m,wind_gusts_10m,wind_direction_10m,temperature_2m,precipitation,cloud_cover",
         "wind_speed_unit": "mph",
         "temperature_unit": "fahrenheit",
-        "precipitation_unit": "mm",
+        "precipitation_unit": "inch",
         "timezone": "auto",
         "forecast_days": 7,
     }
@@ -132,26 +132,25 @@ def score_wind(speeds):
 
 
 def score_gusts(speeds, gusts):
-    """Score gust spread 0.0-1.0. Ideal: <6 mph spread."""
-    spreads = [g - s for g, s in zip(gusts, speeds)]
-    avg_spread = sum(spreads) / len(spreads)
-    if avg_spread <= 6:
+    """Score gusts 0.0-1.0. Ideal: below 20 mph. Above 25 = 0."""
+    max_gust = max(gusts)
+    if max_gust <= 20:
         return 1.0
-    elif avg_spread <= 18:
-        return max(0.0, 1.0 - (avg_spread - 6) / 12)
+    elif max_gust <= 25:
+        return (25 - max_gust) / 5  # gradient 20-25
     else:
         return 0.0
 
 
 def score_precipitation(precips):
-    """Score precipitation 0.0-1.0. Ideal: dry."""
+    """Score precipitation 0.0-1.0. Light rain is OK, heavy rain is a dealbreaker."""
     total = sum(precips)
-    if total == 0:
+    if total < 0.05:
         return 1.0
-    elif total <= 1:
+    elif total < 0.15:
         return 0.7
-    elif total <= 5:
-        return max(0.0, 0.7 - (total - 1) * 0.15)
+    elif total < 0.25:
+        return 0.3
     else:
         return 0.0
 
@@ -168,22 +167,22 @@ def score_cloud_cover(clouds):
 
 
 def score_temperature(temps):
-    """Score temperature 0.0-1.0. Ideal: 75-95F. Below 70 or above 105 = 0."""
+    """Score temperature 0.0-1.0. Ideal: 75-95F. Below 60 or above 105 = 0."""
     avg = sum(temps) / len(temps)
-    if avg < 70 or avg > 105:
+    if avg < 60 or avg > 105:
         return 0.0
     elif 75 <= avg <= 95:
         return 1.0
     elif avg < 75:
-        return (avg - 70) / 5  # gradient 70-75
+        return (avg - 60) / 15  # gradient 60-75
     else:
         return (105 - avg) / 10  # gradient 95-105
 
 
 def score_direction(directions):
-    """Score wind direction 0.0-1.0. W/NW preferred (best fetch on reservoir)."""
-    # Ideal: 270 (W) to 315 (NW)
-    ideal_center = 292.5  # midpoint of W-NW
+    """Score wind direction 0.0-1.0. N preferred (best fetch on reservoir)."""
+    # Ideal: 360/0 (N)
+    ideal_center = 0  # North
     scores = []
     for d in directions:
         # Angular distance from ideal center
@@ -219,7 +218,7 @@ def score_day(day):
     ds = score_direction(day["wind_directions"])
 
     # If wind or temp is outside usable range, cap the score
-    dealbreaker = (ws == 0.0 or ts == 0.0)
+    dealbreaker = (ws == 0.0 or ts == 0.0 or ps == 0.0)
 
     composite = (
         ws * WEIGHT_WIND
@@ -278,6 +277,20 @@ def get_rating_color(rating):
     return colors.get(rating, "#666")
 
 
+def get_score_color(score):
+    """Return a hex color for a component score (0-100)."""
+    if score >= 80:
+        return "#2e7d32"  # green
+    elif score >= 60:
+        return "#558b2f"  # light green
+    elif score >= 40:
+        return "#f9a825"  # amber
+    elif score >= 20:
+        return "#e65100"  # orange
+    else:
+        return "#b71c1c"  # red
+
+
 def format_report(scored_days):
     """Format the forecast report. Returns (plain_text, html) tuple."""
     now = datetime.now()
@@ -299,7 +312,7 @@ def format_report(scored_days):
         lines.append(
             f"  Wind: {day['wind_avg']:.0f} mph avg, gusts {day['gust_max']:.0f} mph  |  "
             f"Dir: {compass}  |  Temp: {day['temp_avg']:.0f}F  |  "
-            f"Cloud: {day['cloud_avg']:.0f}%  |  Rain: {day['precip_total']:.1f} mm"
+            f"Cloud: {day['cloud_avg']:.0f}%  |  Rain: {day['precip_total']:.2f} in"
         )
         wind_parts = "  ".join(
             f"{w['name']}: {w['avg']:.0f} (g{w['gust_max']:.0f})"
@@ -314,7 +327,7 @@ def format_report(scored_days):
         lines.append("")
 
     lines.append("Scoring: Wind 35% | Gusts 20% | Precip 15% | Cloud 10% | Temp 10% | Direction 10%")
-    lines.append("Sailing hours: 11 AM – 5 PM  |  Ideal wind: 10-15 mph from W/NW")
+    lines.append("Sailing hours: 11 AM – 5 PM  |  Ideal wind: 10-15 mph from N")
     lines.append(f"Location: {LOCATION_NAME} ({LATITUDE}, {LONGITUDE})")
     lines.append("Data: Open-Meteo.com")
     plain = "\n".join(lines)
@@ -328,6 +341,13 @@ def format_report(scored_days):
         color = get_rating_color(day["rating"])
         cs = day["component_scores"]
 
+        wc = get_score_color(cs['wind'])
+        gc = get_score_color(cs['gusts'])
+        dc = get_score_color(cs['direction'])
+        tc = get_score_color(cs['temp'])
+        cc = get_score_color(cs['cloud'])
+        pc = get_score_color(cs['precip'])
+
         html_rows.append(f"""
         <tr>
             <td style="padding:8px;font-weight:bold">{date_str}</td>
@@ -336,11 +356,11 @@ def format_report(scored_days):
                     {day['score']} — {day['rating']}
                 </span>
             </td>
-            <td style="padding:8px">{day['wind_avg']:.0f} mph avg, gusts {day['gust_max']:.0f} mph</td>
-            <td style="padding:8px">{compass}</td>
-            <td style="padding:8px">{day['temp_avg']:.0f}°F</td>
-            <td style="padding:8px">{day['cloud_avg']:.0f}%</td>
-            <td style="padding:8px">{day['precip_total']:.1f} mm</td>
+            <td style="padding:8px;color:{wc}">{day['wind_avg']:.0f} mph avg, <span style="color:{gc}">gusts {day['gust_max']:.0f} mph</span></td>
+            <td style="padding:8px;color:{dc}">{compass}</td>
+            <td style="padding:8px;color:{tc}">{day['temp_avg']:.0f}°F</td>
+            <td style="padding:8px;color:{cc}">{day['cloud_avg']:.0f}%</td>
+            <td style="padding:8px;color:{pc}">{day['precip_total']:.2f} in</td>
         </tr>
         <tr>
             <td colspan="7" style="padding:2px 8px 4px 8px;font-size:0.85em;color:#555">
@@ -381,7 +401,7 @@ def format_report(scored_days):
 
     <p style="font-size:0.8em;color:#999;margin-top:20px">
         Scoring: Wind 35% | Gusts 20% | Precip 15% | Cloud 10% | Temp 10% | Direction 10%<br>
-        Sailing hours: 11 AM – 5 PM | Ideal wind: 10–15 mph from W/NW<br>
+        Sailing hours: 11 AM – 5 PM | Ideal wind: 10–15 mph from N<br>
         Location: {LOCATION_NAME} ({LATITUDE}, {LONGITUDE})<br>
         Data: <a href="https://open-meteo.com">Open-Meteo.com</a>
     </p>
@@ -429,14 +449,16 @@ def send_email(subject, plain, html, config):
     )
 
 
+
 def generate_report():
-    """Fetch forecast, score days, and return (plain_text, html) tuple."""
+    """Fetch forecast, score days, and return (plain_text, html, scored_days) tuple."""
     data = fetch_forecast()
     days = parse_forecast(data)
     if not days:
         raise RuntimeError("No forecast data available")
     scored_days = [score_day(day) for day in days]
-    return format_report(scored_days)
+    plain, html = format_report(scored_days)
+    return plain, html, scored_days
 
 
 def main():
