@@ -1,0 +1,56 @@
+name: Build and Deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  build:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: pip install -r requirements.txt ruff
+
+    - name: Run linter
+      run: ruff check .
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Zot registry
+      uses: docker/login-action@v3
+      with:
+        registry: zot.pedanticorderliness.com
+        username: ${{ secrets.ZOT_REG_USER }}
+        password: ${{ secrets.ZOT_REG_PASS }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        push: true
+        tags: |
+          zot.pedanticorderliness.com/wind-notice:${{ github.sha }}
+          zot.pedanticorderliness.com/wind-notice:latest
+
+    - name: Generate a token
+      id: generate_token
+      uses: tibdex/github-app-token@b62528385c34dbc9f38e5f4225ac829252d1ea92
+      with:
+        app_id: ${{ secrets.PO_APP_ID }}
+        private_key: ${{ secrets.PO_PRIVATE_KEY }}
+
+    - name: Update image tag in infrastructure
+      env:
+        GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+      run: |
+        gh workflow run image_update.yaml -R ryanrolds/infrastructure \
+          -r main -F branch=main -F chart=wind-notice -F values_file=prod.yaml \
+          -F tag_path=image.tag -F tag=${{ github.sha }}
