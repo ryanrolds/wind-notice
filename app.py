@@ -39,7 +39,6 @@ def create_app():
     def index():
         with _report_lock:
             html = _report_html
-            updated = _report_updated
         if html is None:
             return "<h2>Forecast loading, check back shortly...</h2>", 503
         return html
