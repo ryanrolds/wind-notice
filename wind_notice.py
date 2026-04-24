@@ -33,11 +33,11 @@ DISPLAY_WINDOWS = [
 
 # Scoring weights
 WEIGHT_WIND = 0.35
-WEIGHT_GUSTS = 0.20
-WEIGHT_PRECIP = 0.15
+WEIGHT_GUSTS = 0.10
+WEIGHT_PRECIP = 0.20
 WEIGHT_TEMP = 0.15
 WEIGHT_CLOUD = 0.05
-WEIGHT_DIRECTION = 0.10
+WEIGHT_DIRECTION = 0.15
 
 # Rating thresholds
 RATINGS = [
@@ -120,85 +120,75 @@ def parse_forecast(data):
     return [days[k] for k in sorted(days)]
 
 
+def _exp_tail(distance, scale):
+    """Exponential decay tail: e^(-distance/scale)."""
+    import math
+    return math.exp(-distance / scale)
+
+
 def score_wind(speeds):
-    """Score wind speed 0.0-1.0. Ideal: 10-15 mph. Below 8 or above 17 = 0."""
+    """Score wind speed 0.0-1.0. Ideal: 10-15 mph with long tails."""
     avg = sum(speeds) / len(speeds)
-    if avg < 8 or avg > 17:
-        return 0.0
-    elif 10 <= avg <= 15:
+    if 10 <= avg <= 15:
         return 1.0
     elif avg < 10:
-        return (avg - 8) / 2  # gradient 8-10
+        return _exp_tail(10 - avg, 0.8)
     else:
-        return (17 - avg) / 2  # gradient 15-17
+        return _exp_tail(avg - 15, 4)
 
 
 def score_gusts(speeds, gusts):
-    """Score gusts 0.0-1.0. Ideal: below 20 mph. Above 25 = 0."""
+    """Score gusts 0.0-1.0. Ideal: 12-18 mph with long tails."""
     max_gust = max(gusts)
-    if max_gust <= 20:
+    if 12 <= max_gust <= 18:
         return 1.0
-    elif max_gust <= 25:
-        return (25 - max_gust) / 5  # gradient 20-25
+    elif max_gust < 12:
+        return _exp_tail(12 - max_gust, 4)
     else:
-        return 0.0
+        return _exp_tail(max_gust - 18, 5)
 
 
 def score_precipitation(precips):
-    """Score precipitation 0.0-1.0. Light rain is OK, heavy rain is a dealbreaker."""
+    """Score precipitation 0.0-1.0. Exponential decay from 0."""
     total = sum(precips)
-    if total < 0.05:
+    if total < 0.01:
         return 1.0
-    elif total < 0.15:
-        return 0.7
-    elif total < 0.25:
-        return 0.3
     else:
-        return 0.0
+        return _exp_tail(total, 0.1)
 
 
 def score_cloud_cover(clouds):
-    """Score cloud cover 0.0-1.0. Partly cloudy (30-70%) is ideal for comfort."""
+    """Score cloud cover 0.0-1.0. Partly cloudy (30-70%) is ideal with long tails."""
     avg = sum(clouds) / len(clouds)
     if 30 <= avg <= 70:
         return 1.0
     elif avg < 30:
-        return 0.5 + (avg / 30) * 0.5  # clear sky still decent, 0.5-1.0
+        return _exp_tail(30 - avg, 15)
     else:
-        return max(0.3, 1.0 - (avg - 70) / 30 * 0.7)  # overcast less fun, 0.3-1.0
+        return _exp_tail(avg - 70, 15)
 
 
 def score_temperature(temps):
-    """Score temperature 0.0-1.0. Ideal: 75-95F. Below 60 or above 105 = 0."""
+    """Score temperature 0.0-1.0. Ideal: 75-95F with long tails."""
     avg = sum(temps) / len(temps)
-    if avg < 60 or avg > 105:
-        return 0.0
-    elif 75 <= avg <= 95:
+    if 75 <= avg <= 95:
         return 1.0
     elif avg < 75:
-        return (avg - 60) / 15  # gradient 60-75
+        return _exp_tail(75 - avg, 3)
     else:
-        return (105 - avg) / 10  # gradient 95-105
+        return _exp_tail(avg - 95, 8)
 
 
 def score_direction(directions):
-    """Score wind direction 0.0-1.0. N preferred (best fetch on reservoir)."""
-    # Ideal: 360/0 (N)
-    ideal_center = 0  # North
+    """Score wind direction 0.0-1.0. N preferred with smooth cosine falloff."""
+    import math
     scores = []
     for d in directions:
-        # Angular distance from ideal center
-        diff = abs(d - ideal_center)
+        diff = abs(d)
         if diff > 180:
             diff = 360 - diff
-        if diff <= 22.5:
-            scores.append(1.0)
-        elif diff <= 67.5:
-            scores.append(0.7)
-        elif diff <= 112.5:
-            scores.append(0.4)
-        else:
-            scores.append(0.2)
+        # Cosine decay: 1.0 at N, ~0.07 at S
+        scores.append(0.5 * (1 + math.cos(math.radians(diff))))
     return sum(scores) / len(scores)
 
 
@@ -224,9 +214,6 @@ def score_day(day):
     ts = score_temperature(day["temperatures"])
     ds = score_direction(day["wind_directions"])
 
-    # If wind or temp is outside usable range, cap the score
-    dealbreaker = (ws == 0.0 or ts == 0.0 or ps == 0.0)
-
     composite = (
         ws * WEIGHT_WIND
         + gs * WEIGHT_GUSTS
@@ -236,9 +223,7 @@ def score_day(day):
         + ds * WEIGHT_DIRECTION
     )
 
-    if dealbreaker:
-        composite = min(composite, 0.34)  # cap at Unfavorable
-
+    composite = composite ** 1.5
     day["score"] = round(composite * 100)
     day["rating"] = next(label for threshold, label in RATINGS if day["score"] >= threshold)
     day["wind_avg"] = sum(day["wind_speeds"]) / len(day["wind_speeds"])
@@ -361,16 +346,16 @@ def format_report(scored_days):
         <table style="width:100%;border-collapse:collapse;font-size:0.95em">
         <tr class="day-row">
             <td class="day-name" style="padding:4px 8px;font-weight:bold">{date_str}</td>
-            <td class="day-rating" style="padding:4px 8px;text-align:center">
+            <td class="day-rating" style="padding:4px 8px;text-align:center" title="Weighted composite score (power curve p=1.5)&#10;Wind:{cs['wind']} Gusts:{cs['gusts']} Precip:{cs['precip']} Cloud:{cs['cloud']} Temp:{cs['temp']} Dir:{cs['direction']}">
                 <span style="background:{color};color:#fff;padding:3px 10px;border-radius:4px;font-weight:bold">
                     {day['score']} — {day['rating']}
                 </span>
             </td>
-            <td class="day-wind" style="padding:4px 8px;color:{wc}">{day['wind_avg']:.0f} mph avg, <span style="color:{gc}">gusts {day['gust_max']:.0f} mph</span></td>
-            <td class="day-dir" style="padding:4px 8px;color:{dc}">{compass}</td>
-            <td class="day-temp" style="padding:4px 8px;color:{tc}">{day['temp_avg']:.0f}°F</td>
-            <td class="day-cloud" style="padding:4px 8px;color:{cc}">{day['cloud_avg']:.0f}%</td>
-            <td class="day-rain" style="padding:4px 8px;color:{pc}">{day['precip_total']:.2f} in</td>
+            <td class="day-wind" style="padding:4px 8px;color:{wc}" title="Wind score: {cs['wind']}/100 (weight 35%)&#10;Avg: {day['wind_avg']:.1f} mph&#10;Ideal: 10–15 mph"><span>{day['wind_avg']:.0f} mph avg</span>, <span style="color:{gc}" title="Gust score: {cs['gusts']}/100 (weight 10%)&#10;Max gust: {day['gust_max']:.1f} mph&#10;Ideal: 12–18 mph">gusts {day['gust_max']:.0f} mph</span></td>
+            <td class="day-dir" style="padding:4px 8px;color:{dc}" title="Direction score: {cs['direction']}/100 (weight 15%)&#10;Avg: {day['dir_avg']:.0f}° ({compass})&#10;Ideal: North (0°)">{compass}</td>
+            <td class="day-temp" style="padding:4px 8px;color:{tc}" title="Temp score: {cs['temp']}/100 (weight 15%)&#10;Avg: {day['temp_avg']:.1f}°F&#10;Ideal: 75–95°F">{day['temp_avg']:.0f}°F</td>
+            <td class="day-cloud" style="padding:4px 8px;color:{cc}" title="Cloud score: {cs['cloud']}/100 (weight 5%)&#10;Avg: {day['cloud_avg']:.1f}%&#10;Ideal: 30–70%">{day['cloud_avg']:.0f}%</td>
+            <td class="day-rain" style="padding:4px 8px;color:{pc}" title="Precip score: {cs['precip']}/100 (weight 20%)&#10;Total: {day['precip_total']:.3f} in&#10;Ideal: &lt; 0.01 in">{day['precip_total']:.2f} in</td>
         </tr>
         <tr class="day-detail">
             <td colspan="7" style="padding:2px 8px 4px 8px;font-size:0.85em;color:#555">
