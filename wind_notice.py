@@ -393,24 +393,20 @@ def format_report(scored_days):
     cond_temp = today["temp_avg"]
     cond_weather_code = today["weather_code"]
 
-    # Body background based on weather code, with fallback to cloud/precip logic
+    # Body background matches front wave (waterColors[2]) for seamless appearance
     wc = cond_weather_code
     if wc >= 95:
-        body_bg = '#546e7a'  # storm
+        body_bg = '#1a2327'  # storm
     elif 71 <= wc <= 77 or 85 <= wc <= 86:
-        body_bg = '#b0bec5'  # snow
+        body_bg = '#263238'  # snow
     elif wc in (45, 48):
-        body_bg = '#b0bec5'  # fog
+        body_bg = '#1d4d9c'  # fog (water tinted by fog overlay)
     elif wc >= 51:
-        body_bg = '#90a4ae'  # rain/drizzle/freezing rain
+        body_bg = '#1a2327'  # rain/drizzle/freezing rain
     elif cond_precip > 0.1:
-        body_bg = '#90a4ae'
-    elif cond_cloud > 70:
-        body_bg = '#b0bec5'
-    elif cond_cloud > 40:
-        body_bg = '#90caf9'
+        body_bg = '#1a2327'
     else:
-        body_bg = '#42a5f5'
+        body_bg = '#0a3d91'
 
     best_date_str = best["date"].strftime("%A, %b %d")
     html = f"""<!DOCTYPE html>
@@ -482,7 +478,12 @@ def format_report(scored_days):
     <script>
     (function() {{
       var wx = {{ cloud: {cond_cloud:.0f}, wind: {cond_wind:.1f}, gust: {cond_gust:.1f}, precip: {cond_precip:.2f}, temp: {cond_temp:.1f}, weather_code: {cond_weather_code} }};
-      if (new URLSearchParams(window.location.search).get('random') === 'true') {{
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('cloud') !== null) {{
+        // URL parameter override mode
+        wx = {{ cloud: parseFloat(params.get('cloud'))||0, wind: parseFloat(params.get('wind'))||0, gust: parseFloat(params.get('gust'))||0, precip: parseFloat(params.get('precip'))||0, temp: parseFloat(params.get('temp'))||60, weather_code: 0 }};
+        wx.effectNames = params.get('effects') || '';
+      }} else if (params.get('random') === 'true') {{
         wx = {{ cloud: Math.random()*100, wind: Math.random()*30, gust: Math.random()*45, precip: Math.random() < 0.3 ? 0.1 + Math.random()*0.4 : 0, temp: 45+Math.random()*35, weather_code: 0 }};
         // Weighted multi-effect selection: 40% none, 30% one, 20% two, 10% three
         var roll = Math.random();
@@ -498,9 +499,12 @@ def format_report(scored_days):
         if (numEffects > 0) wx.precip = Math.max(wx.precip, 0.1);
       }}
 
-      // Derive active effects from weather code or random mode
+      // Derive active effects
       var activeEffects = [];
-      if (wx.activeEffects) {{
+      if (wx.effectNames !== undefined) {{
+        // URL parameter mode: effect names passed directly
+        if (wx.effectNames) activeEffects = wx.effectNames.split(',');
+      }} else if (wx.activeEffects) {{
         // Random mode: map codes to effect names
         var codeToEffects = function(code) {{
           var e = [];
@@ -579,7 +583,7 @@ def format_report(scored_days):
           color: ''
         }};
       }}
-      var numClouds = Math.max(2, Math.round(3 + cloudFrac * 6 + Math.random()*2));
+      var numClouds = cloudFrac < 0.05 ? 0 : Math.round(cloudFrac * 10 + Math.random() * 2);
       var clouds = [];
       for (var ci = 0; ci < numClouds; ci++) clouds.push(makeCloud());
       clouds.sort(function(a, b) {{ return a.y - b.y; }});
@@ -598,7 +602,7 @@ def format_report(scored_days):
         if (hasEffect('heavyrain') || hasEffect('drizzle') || hasEffect('freezingrain')) return;
         var numDrops = Math.round(80 + wx.precip * 400);
         for (var ri = 0; ri < numDrops; ri++) {{
-          rainDrops.push({{ x: Math.random() * 2000, y: Math.random() * 600, len: 8 + Math.random() * 14, speed: 300 + Math.random() * 200 }});
+          rainDrops.push({{ x: Math.random() * W, y: Math.random() * H, len: 8 + Math.random() * 14, speed: 300 + Math.random() * 200 }});
         }}
       }}
       initRain();
@@ -609,7 +613,7 @@ def format_report(scored_days):
         if (!hasEffect('drizzle')) return;
         var numDrops = Math.round(60 + wx.precip * 200);
         for (var i = 0; i < numDrops; i++) {{
-          drizzleDrops.push({{ x: Math.random() * 2000, y: Math.random() * 600, len: 4 + Math.random() * 6, speed: 150 + Math.random() * 100 }});
+          drizzleDrops.push({{ x: Math.random() * W, y: Math.random() * H, len: 4 + Math.random() * 6, speed: 150 + Math.random() * 100 }});
         }}
       }}
       initDrizzle();
@@ -621,7 +625,7 @@ def format_report(scored_days):
         if (!hasEffect('heavyrain')) return;
         var numDrops = Math.round(200 + wx.precip * 600);
         for (var i = 0; i < numDrops; i++) {{
-          heavyDrops.push({{ x: Math.random() * 2000, y: Math.random() * 600, len: 14 + Math.random() * 18, speed: 450 + Math.random() * 250 }});
+          heavyDrops.push({{ x: Math.random() * W, y: Math.random() * H, len: 14 + Math.random() * 18, speed: 450 + Math.random() * 250 }});
         }}
       }}
       initHeavyRain();
@@ -632,7 +636,7 @@ def format_report(scored_days):
         if (!hasEffect('freezingrain')) return;
         var numDrops = Math.round(80 + wx.precip * 400);
         for (var i = 0; i < numDrops; i++) {{
-          freezeDrops.push({{ x: Math.random() * 2000, y: Math.random() * 600, len: 8 + Math.random() * 14, speed: 300 + Math.random() * 200 }});
+          freezeDrops.push({{ x: Math.random() * W, y: Math.random() * H, len: 8 + Math.random() * 14, speed: 300 + Math.random() * 200 }});
         }}
       }}
       initFreezingRain();
@@ -643,7 +647,7 @@ def format_report(scored_days):
         if (!hasEffect('snow')) return;
         var numFlakes = Math.round(60 + Math.random() * 40);
         for (var i = 0; i < numFlakes; i++) {{
-          snowFlakes.push({{ x: Math.random() * 2000, y: Math.random() * 600, r: 1.5 + Math.random() * 3, speed: 30 + Math.random() * 40, drift: (Math.random() - 0.3) * 0.8 }});
+          snowFlakes.push({{ x: Math.random() * W, y: Math.random() * 220 - 20, r: 1.5 + Math.random() * 3, speed: 30 + Math.random() * 40, drift: (Math.random() - 0.3) * 0.8 }});
         }}
       }}
       initSnow();
@@ -654,7 +658,7 @@ def format_report(scored_days):
         if (!hasEffect('hail')) return;
         var numStones = Math.round(30 + Math.random() * 20);
         for (var i = 0; i < numStones; i++) {{
-          hailStones.push({{ x: Math.random() * 2000, y: Math.random() * 400, r: 2 + Math.random() * 3, vy: 200 + Math.random() * 150, vx: 0, bouncing: false }});
+          hailStones.push({{ x: Math.random() * W, y: Math.random() * H, r: 2 + Math.random() * 3, vy: 200 + Math.random() * 150, vx: 0, bouncing: false }});
         }}
       }}
       initHail();
@@ -683,6 +687,13 @@ def format_report(scored_days):
       var fogOffset1 = Math.random() * 1000;
       var fogOffset2 = Math.random() * 1000;
 
+      function lerpHex(a, b, t) {{
+        var ar = parseInt(a.slice(1,3),16), ag = parseInt(a.slice(3,5),16), ab = parseInt(a.slice(5,7),16);
+        var br = parseInt(b.slice(1,3),16), bg = parseInt(b.slice(3,5),16), bb = parseInt(b.slice(5,7),16);
+        var r = Math.round(ar+(br-ar)*t), g = Math.round(ag+(bg-ag)*t), bl = Math.round(ab+(bb-ab)*t);
+        return '#'+((1<<24)|(r<<16)|(g<<8)|bl).toString(16).slice(1);
+      }}
+
       var t = 0;
       function draw() {{
         t += 0.016;
@@ -708,21 +719,22 @@ def format_report(scored_days):
           sky.addColorStop(0, '#78909c');
           sky.addColorStop(0.4, '#90a4ae');
           sky.addColorStop(1, '#b0bec5');
-        }} else if (cloudFrac > 0.7) {{
-          sky.addColorStop(0, '#90a4ae');
-          sky.addColorStop(0.3, '#b0bec5');
-          sky.addColorStop(0.6, '#cfd8dc');
-          sky.addColorStop(1, '#eceff1');
-        }} else if (cloudFrac > 0.4) {{
-          sky.addColorStop(0, '#64b5f6');
-          sky.addColorStop(0.3, '#90caf9');
-          sky.addColorStop(0.6, '#bbdefb');
-          sky.addColorStop(1, '#e3f2fd');
         }} else {{
-          sky.addColorStop(0, '#1976d2');
-          sky.addColorStop(0.3, '#42a5f5');
-          sky.addColorStop(0.6, '#90caf9');
-          sky.addColorStop(1, '#bbdefb');
+          var clearSky = ['#1976d2','#42a5f5','#90caf9','#bbdefb'];
+          var partSky  = ['#64b5f6','#90caf9','#bbdefb','#e3f2fd'];
+          var overSky  = ['#90a4ae','#b0bec5','#cfd8dc','#eceff1'];
+          var skyStops = [0, 0.3, 0.6, 1];
+          var palA, palB, blend;
+          if (cloudFrac <= 0.5) {{
+            palA = clearSky; palB = partSky;
+            blend = cloudFrac / 0.5;
+          }} else {{
+            palA = partSky; palB = overSky;
+            blend = (cloudFrac - 0.5) / 0.5;
+          }}
+          for (var i = 0; i < 4; i++) {{
+            sky.addColorStop(skyStops[i], lerpHex(palA[i], palB[i], blend));
+          }}
         }}
         ctx.fillStyle = sky;
         ctx.fillRect(0, 0, W, H);
@@ -733,6 +745,25 @@ def format_report(scored_days):
           ctx.fillRect(0, 0, W, H);
           lightningFlash -= 0.016 * 4;
           if (lightningFlash < 0) lightningFlash = 0;
+        }}
+
+        // --- Sun ---
+        if (cloudFrac < 0.7 && !isStormy && !isFoggy) {{
+          var sunAlpha = Math.min(1, (1 - cloudFrac / 0.7));
+          ctx.save();
+          // Glow
+          ctx.beginPath();
+          ctx.arc(W * 0.82, 55, 45, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,235,130,' + (sunAlpha * 0.15) + ')';
+          ctx.fill();
+          // Disc
+          ctx.beginPath();
+          ctx.arc(W * 0.82, 55, 22, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,220,80,' + sunAlpha + ')';
+          ctx.shadowColor = 'rgba(255,200,50,' + (sunAlpha * 0.8) + ')';
+          ctx.shadowBlur = 30;
+          ctx.fill();
+          ctx.restore();
         }}
 
         // --- Clouds ---
@@ -1033,18 +1064,27 @@ def format_report(scored_days):
         // --- Fog foreground overlay ---
         if (hasEffect('fog')) {{
           ctx.save();
-          var fogFG = ctx.createLinearGradient(0, 140, 0, 250);
+          var fogFG = ctx.createLinearGradient(0, 140, 0, 220);
           fogFG.addColorStop(0, 'rgba(200,210,220,0)');
-          fogFG.addColorStop(0.5, 'rgba(200,210,220,0.15)');
-          fogFG.addColorStop(1, 'rgba(200,210,220,0.08)');
+          fogFG.addColorStop(0.5, 'rgba(200,210,220,0.12)');
+          fogFG.addColorStop(1, 'rgba(200,210,220,0.12)');
           ctx.fillStyle = fogFG;
-          ctx.fillRect(0, 140, W, 110);
+          ctx.fillRect(0, 140, W, H - 140);
           ctx.restore();
         }}
 
         requestAnimationFrame(draw);
       }}
       draw();
+
+      document.addEventListener('DOMContentLoaded', function() {{
+        var dbg = document.getElementById('wx-debug');
+        if (dbg) {{
+          var qs = '?cloud=' + wx.cloud.toFixed(0) + '&wind=' + wx.wind.toFixed(1) + '&gust=' + wx.gust.toFixed(1) + '&precip=' + wx.precip.toFixed(2) + '&temp=' + wx.temp.toFixed(1);
+          if (activeEffects.length) qs += '&effects=' + activeEffects.join(',');
+          dbg.textContent = qs;
+        }}
+      }});
     }})();
     </script>
 
@@ -1057,12 +1097,14 @@ def format_report(scored_days):
         {"".join(html_rows)}
     </div>
 
-    <p style="font-size:0.8em;color:rgba(255,255,255,0.7);margin-top:20px;padding-bottom:16px">
+    <p style="font-size:0.8em;color:rgba(255,255,255,0.35);margin-top:20px;padding-bottom:4px">
         Scoring: Wind 35% | Gusts 20% | Precip 15% | Cloud 10% | Temp 10% | Direction 10%<br>
         Sailing hours: 11 AM – 5 PM | Ideal wind: 10–15 mph from N<br>
         Location: {LOCATION_NAME} ({LATITUDE}, {LONGITUDE})<br>
-        Data: <a href="https://open-meteo.com" style="color:rgba(255,255,255,0.85)">Open-Meteo.com</a>
+        Data: <a href="https://open-meteo.com" style="color:rgba(255,255,255,0.45)">Open-Meteo.com</a>
     </p>
+    <p id="wx-debug" style="font-size:0.7em;color:rgba(255,255,255,0.35);margin:0;padding-bottom:8px;word-break:break-all"></p>
+    <p style="font-size:0.7em;color:rgba(255,255,255,0.4);margin:0;padding-bottom:16px">&copy; {now.year} Ryan R. Olds — <a href="https://github.com/ryanrolds" style="color:rgba(255,255,255,0.5)">GitHub</a> · <a href="https://www.linkedin.com/in/ryanrolds/" style="color:rgba(255,255,255,0.5)">LinkedIn</a></p>
     </div>
 </body>
 </html>"""
