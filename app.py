@@ -244,6 +244,9 @@ def create_app():
     @app.route("/robots.txt")
     def robots():
         body = (
+            "User-agent: facebookexternalhit\n"
+            "Allow: /\n"
+            "\n"
             "User-agent: *\n"
             "Allow: /\n"
         )
