@@ -349,18 +349,20 @@ def format_report(scored_days):
         pc = get_score_color(cs['precip'])
 
         html_rows.append(f"""
+    <div class="day-card" style="background:#fff;border-radius:8px;padding:12px 16px;margin:10px 0;box-shadow:0 1px 3px rgba(0,0,0,0.12)">
+        <table style="width:100%;border-collapse:collapse;font-size:0.95em">
         <tr class="day-row">
-            <td class="day-name" style="padding:14px 8px 8px 8px;font-weight:bold">{date_str}</td>
-            <td class="day-rating" style="padding:8px;text-align:center">
+            <td class="day-name" style="padding:4px 8px;font-weight:bold">{date_str}</td>
+            <td class="day-rating" style="padding:4px 8px;text-align:center">
                 <span style="background:{color};color:#fff;padding:3px 10px;border-radius:4px;font-weight:bold">
                     {day['score']} — {day['rating']}
                 </span>
             </td>
-            <td class="day-wind" style="padding:8px;color:{wc}">{day['wind_avg']:.0f} mph avg, <span style="color:{gc}">gusts {day['gust_max']:.0f} mph</span></td>
-            <td class="day-dir" style="padding:8px;color:{dc}">{compass}</td>
-            <td class="day-temp" style="padding:8px;color:{tc}">{day['temp_avg']:.0f}°F</td>
-            <td class="day-cloud" style="padding:8px;color:{cc}">{day['cloud_avg']:.0f}%</td>
-            <td class="day-rain" style="padding:8px;color:{pc}">{day['precip_total']:.2f} in</td>
+            <td class="day-wind" style="padding:4px 8px;color:{wc}">{day['wind_avg']:.0f} mph avg, <span style="color:{gc}">gusts {day['gust_max']:.0f} mph</span></td>
+            <td class="day-dir" style="padding:4px 8px;color:{dc}">{compass}</td>
+            <td class="day-temp" style="padding:4px 8px;color:{tc}">{day['temp_avg']:.0f}°F</td>
+            <td class="day-cloud" style="padding:4px 8px;color:{cc}">{day['cloud_avg']:.0f}%</td>
+            <td class="day-rain" style="padding:4px 8px;color:{pc}">{day['precip_total']:.2f} in</td>
         </tr>
         <tr class="day-detail">
             <td colspan="7" style="padding:2px 8px 4px 8px;font-size:0.85em;color:#555">
@@ -368,10 +370,12 @@ def format_report(scored_days):
             </td>
         </tr>
         <tr class="day-detail">
-            <td colspan="7" style="padding:2px 8px 14px 8px;font-size:0.85em;color:#666">
+            <td colspan="7" style="padding:2px 8px 4px 8px;font-size:0.85em;color:#666">
                 Wind:{cs['wind']} | Gusts:{cs['gusts']} | Precip:{cs['precip']} | Cloud:{cs['cloud']} | Temp:{cs['temp']} | Dir:{cs['direction']}
             </td>
-        </tr>""")
+        </tr>
+        </table>
+    </div>""")
 
     best_date_str = best["date"].strftime("%A, %b %d")
     html = f"""<!DOCTYPE html>
@@ -379,25 +383,19 @@ def format_report(scored_days):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M50 10 L50 80 L20 80 Z' fill='%231565c0'/><path d='M50 20 L50 70 L75 70 Z' fill='%2342a5f5'/><path d='M15 82 L85 82 Q90 90 80 90 L20 90 Q10 90 15 82Z' fill='%23333'/></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M0 80 Q15 75 30 80 Q45 85 60 80 Q75 75 90 80 Q95 82 100 80 L100 100 L0 100Z' fill='%231565c0'/><path d='M0 88 Q20 83 40 88 Q60 93 80 88 Q90 85 100 88 L100 100 L0 100Z' fill='%230d47a1'/><path d='M50 10 L50 80 L20 80 Z' fill='%232196f3'/><path d='M50 20 L50 70 L75 70 Z' fill='%2364b5f6'/><path d='M15 82 L85 82 Q90 90 80 90 L20 90 Q10 90 15 82Z' fill='%23e53935'/></svg>">
 <style>
-  .forecast-wrap {{ overflow-x: auto; -webkit-overflow-scrolling: touch; }}
   @media screen and (max-width: 600px) {{
-    body {{ padding: 0 12px !important; font-size: 16px !important; }}
+    body {{ font-size: 16px !important; }}
     h2 {{ font-size: 1.3em; }}
 
-    .day-header {{ display: none; }}
-
-    .forecast-wrap {{ overflow-x: visible; }}
-    table {{ width: 100% !important; }}
+    .day-card table {{ width: 100% !important; }}
 
     .day-row {{
       display: flex;
       flex-wrap: wrap;
       position: relative;
-      border-top: 2px solid #ddd;
-      padding: 16px 0 8px 0;
-      margin-top: 4px;
+      padding: 4px 0 8px 0;
     }}
     .day-row td {{
       display: block;
@@ -411,7 +409,7 @@ def format_report(scored_days):
     }}
     .day-rating {{
       position: absolute;
-      top: 14px;
+      top: 4px;
       right: 0;
       padding: 0 !important;
     }}
@@ -439,36 +437,171 @@ def format_report(scored_days):
   }}
 </style>
 </head>
-<body style="font-family:Arial,Helvetica,sans-serif;max-width:700px;margin:0 auto;color:#333">
-    <h2 style="color:#1565c0"><img src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M50 10 L50 80 L20 80 Z' fill='%231565c0'/><path d='M50 20 L50 70 L75 70 Z' fill='%2342a5f5'/><path d='M15 82 L85 82 Q90 90 80 90 L20 90 Q10 90 15 82Z' fill='%23333'/></svg>" alt="" style="width:1.2em;height:1.2em;vertical-align:middle;margin-right:6px">Fern Ridge Sailing Forecast</h2>
-    <p style="color:#666">{now.strftime('%A, %B %d, %Y')}</p>
+<body style="font-family:Arial,Helvetica,sans-serif;margin:0;color:#333;background:#42a5f5">
+    <canvas id="bg-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0"></canvas>
+    <div style="position:relative;z-index:1;max-width:700px;margin:0 auto;padding:0 12px">
+    <div style="text-align:center;padding:28px 0 144px 0">
+        <h2 style="color:white;margin:0 0 6px 0;text-shadow:0 2px 8px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.3)">Fern Ridge Sailing Forecast</h2>
+        <p style="color:rgba(255,255,255,0.95);margin:0;text-shadow:0 2px 8px rgba(0,0,0,0.6), 0 1px 3px rgba(0,0,0,0.4), 0 0 12px rgba(0,0,0,0.3)">{now.strftime('%A, %B %d, %Y')}</p>
+    </div>
+    <script>
+    (function() {{
+      var c = document.getElementById('bg-canvas');
+      var ctx = c.getContext('2d');
+      var dpr = window.devicePixelRatio || 1;
+      var W, H;
+      function resize() {{
+        W = window.innerWidth;
+        H = window.innerHeight;
+        c.width = W * dpr;
+        c.height = H * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }}
+      resize();
+      window.addEventListener('resize', resize);
 
-    <div style="background:#e3f2fd;padding:12px 16px;border-radius:6px;margin:16px 0">
+      function makeCloud() {{
+        var numPuffs = 3 + Math.floor(Math.random() * 4);
+        var puffs = [];
+        for (var i = 0; i < numPuffs; i++) {{
+          puffs.push([
+            (i - numPuffs/2) * (20 + Math.random()*15),
+            (Math.random() - 0.5) * 25,
+            15 + Math.random() * 22
+          ]);
+        }}
+        return {{
+          x: Math.random() * 900 - 100,
+          y: 15 + Math.random() * 80,
+          s: 0.5 + Math.random() * 0.8,
+          speed: 4 + Math.random() * 12,
+          puffs: puffs
+        }};
+      }}
+      var clouds = [];
+      for (var ci = 0; ci < 5 + Math.floor(Math.random()*3); ci++) clouds.push(makeCloud());
+
+      var t = 0;
+      function draw() {{
+        t += 0.016;
+        ctx.clearRect(0, 0, W, H);
+
+        var sky = ctx.createLinearGradient(0, 0, 0, H);
+        sky.addColorStop(0, '#64b5f6');
+        sky.addColorStop(0.3, '#90caf9');
+        sky.addColorStop(0.6, '#bbdefb');
+        sky.addColorStop(1, '#e3f2fd');
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, W, H);
+
+        for (var i = 0; i < clouds.length; i++) {{
+          var cl = clouds[i];
+          cl.x += cl.speed * 0.016;
+          if (cl.x > W + 100) cl.x = -140 * cl.s;
+          ctx.save();
+          ctx.translate(cl.x, cl.y);
+          ctx.scale(cl.s, cl.s);
+          ctx.fillStyle = '#ffffff';
+          for (var p = 0; p < cl.puffs.length; p++) {{
+            ctx.beginPath();
+            ctx.arc(cl.puffs[p][0], cl.puffs[p][1], cl.puffs[p][2], 0, Math.PI*2);
+            ctx.fill();
+          }}
+          ctx.restore();
+        }}
+
+        function drawWaveLayer(idx) {{
+          var waterColors = ['#1565c0','#0d47a1','#0a3d91'];
+          var amp = 8 - idx * 1.5;
+          var yBase = 185 + idx * 12;
+          var speed = 1 + idx * 0.4;
+          ctx.fillStyle = waterColors[idx];
+          ctx.beginPath();
+          ctx.moveTo(0, H);
+          for (var x = 0; x <= W; x += 4) {{
+            ctx.lineTo(x, yBase + Math.sin(x*0.015 + t*speed)*amp + Math.sin(x*0.008 + t*speed*0.6)*amp*0.5);
+          }}
+          ctx.lineTo(W, H);
+          ctx.closePath();
+          ctx.fill();
+        }}
+
+        function waveY(x) {{
+          return 197 + Math.sin(x*0.015 + t*1.4)*6.5 + Math.sin(x*0.008 + t*0.84)*3.25;
+        }}
+
+        function drawBoat() {{
+          var boatX = W * 0.75;
+          var bob = Math.sin(t * 2.2) * 3;
+          var boatY = waveY(boatX) - 23 + bob;
+          var dx = 4;
+          var tilt = Math.atan2(waveY(boatX + dx) - waveY(boatX - dx), dx * 2);
+          ctx.save();
+          ctx.translate(boatX, boatY);
+          ctx.rotate(tilt);
+
+          ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(0, -75);
+          ctx.lineTo(0, 18);
+          ctx.stroke();
+
+          ctx.fillStyle = 'rgba(255,255,255,0.92)';
+          ctx.beginPath();
+          ctx.moveTo(0, -72);
+          ctx.lineTo(0, 15);
+          ctx.lineTo(-34, 15);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.fillStyle = 'rgba(255,255,255,0.7)';
+          ctx.beginPath();
+          ctx.moveTo(0, -58);
+          ctx.lineTo(0, 10);
+          ctx.lineTo(24, 10);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.fillStyle = '#e53935';
+          ctx.beginPath();
+          ctx.moveTo(-36, 17);
+          ctx.lineTo(36, 17);
+          ctx.quadraticCurveTo(42, 30, 32, 33);
+          ctx.lineTo(-32, 33);
+          ctx.quadraticCurveTo(-42, 30, -36, 17);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }}
+
+        drawWaveLayer(0);
+        drawBoat();
+        drawWaveLayer(1);
+        drawWaveLayer(2);
+
+        requestAnimationFrame(draw);
+      }}
+      draw();
+    }})();
+    </script>
+
+    <div style="background:linear-gradient(135deg,#fff8e1,#ffecb3);padding:12px 16px;border-radius:8px;margin:10px 0;box-shadow:0 1px 3px rgba(0,0,0,0.12)">
         <strong>Best day:</strong> {best_date_str}
         — Score {best['score']} ({best['rating']})
     </div>
 
     <div class="forecast-wrap">
-    <table style="width:100%;border-collapse:collapse;font-size:0.95em">
-        <tr class="day-header" style="background:#f5f5f5">
-            <th style="padding:8px;text-align:left">Day</th>
-            <th style="padding:8px;text-align:center">Rating</th>
-            <th style="padding:8px;text-align:left">Wind</th>
-            <th style="padding:8px;text-align:left">Dir</th>
-            <th style="padding:8px;text-align:left">Temp</th>
-            <th style="padding:8px;text-align:left">Cloud</th>
-            <th style="padding:8px;text-align:left">Rain</th>
-        </tr>
         {"".join(html_rows)}
-    </table>
     </div>
 
-    <p style="font-size:0.8em;color:#999;margin-top:20px">
+    <p style="font-size:0.8em;color:rgba(255,255,255,0.7);margin-top:20px;padding-bottom:16px">
         Scoring: Wind 35% | Gusts 20% | Precip 15% | Cloud 10% | Temp 10% | Direction 10%<br>
         Sailing hours: 11 AM – 5 PM | Ideal wind: 10–15 mph from N<br>
         Location: {LOCATION_NAME} ({LATITUDE}, {LONGITUDE})<br>
-        Data: <a href="https://open-meteo.com">Open-Meteo.com</a>
+        Data: <a href="https://open-meteo.com" style="color:rgba(255,255,255,0.85)">Open-Meteo.com</a>
     </p>
+    </div>
 </body>
 </html>"""
 
