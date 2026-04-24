@@ -813,8 +813,9 @@ def format_report(scored_days):
           ctx.fillStyle = waterColors[idx];
           ctx.beginPath();
           ctx.moveTo(0, H);
+          var phaseOff = idx * 2.1;
           for (var x = 0; x <= W; x += 4) {{
-            ctx.lineTo(x, yBase + Math.sin(x*0.015 + t*speed)*amp + Math.sin(x*0.008 + t*speed*0.6)*amp*0.5);
+            ctx.lineTo(x, yBase + Math.sin(x*0.015 + t*speed + phaseOff)*amp + Math.sin(x*0.008 + t*speed*0.6 + phaseOff)*amp*0.5);
           }}
           ctx.lineTo(W, H);
           ctx.closePath();
@@ -824,7 +825,7 @@ def format_report(scored_days):
         function waveY(x) {{
           var a = 6.5 * waveAmpScale;
           var s = 1.4 * waveSpeedScale;
-          return 197 + Math.sin(x*0.015 + t*s)*a + Math.sin(x*0.008 + t*s*0.6)*a*0.5;
+          return 197 + Math.sin(x*0.015 + t*s + 2.1)*a + Math.sin(x*0.008 + t*s*0.6 + 2.1)*a*0.5;
         }}
 
         function drawBoat() {{
