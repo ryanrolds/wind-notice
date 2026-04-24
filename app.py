@@ -246,8 +246,6 @@ def create_app():
         body = (
             "User-agent: *\n"
             "Allow: /\n"
-            "Disallow: /healthz\n"
-            "Disallow: /simulation\n"
         )
         return body, 200, {"Content-Type": "text/plain; charset=utf-8"}
 
