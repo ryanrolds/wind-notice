@@ -349,26 +349,26 @@ def format_report(scored_days):
         pc = get_score_color(cs['precip'])
 
         html_rows.append(f"""
-        <tr>
-            <td style="padding:8px;font-weight:bold">{date_str}</td>
-            <td style="padding:8px;text-align:center">
+        <tr class="day-row">
+            <td class="day-name" style="padding:14px 8px 8px 8px;font-weight:bold">{date_str}</td>
+            <td class="day-rating" style="padding:8px;text-align:center">
                 <span style="background:{color};color:#fff;padding:3px 10px;border-radius:4px;font-weight:bold">
                     {day['score']} — {day['rating']}
                 </span>
             </td>
-            <td style="padding:8px;color:{wc}">{day['wind_avg']:.0f} mph avg, <span style="color:{gc}">gusts {day['gust_max']:.0f} mph</span></td>
-            <td style="padding:8px;color:{dc}">{compass}</td>
-            <td style="padding:8px;color:{tc}">{day['temp_avg']:.0f}°F</td>
-            <td style="padding:8px;color:{cc}">{day['cloud_avg']:.0f}%</td>
-            <td style="padding:8px;color:{pc}">{day['precip_total']:.2f} in</td>
+            <td class="day-wind" style="padding:8px;color:{wc}">{day['wind_avg']:.0f} mph avg, <span style="color:{gc}">gusts {day['gust_max']:.0f} mph</span></td>
+            <td class="day-dir" style="padding:8px;color:{dc}">{compass}</td>
+            <td class="day-temp" style="padding:8px;color:{tc}">{day['temp_avg']:.0f}°F</td>
+            <td class="day-cloud" style="padding:8px;color:{cc}">{day['cloud_avg']:.0f}%</td>
+            <td class="day-rain" style="padding:8px;color:{pc}">{day['precip_total']:.2f} in</td>
         </tr>
-        <tr>
+        <tr class="day-detail">
             <td colspan="7" style="padding:2px 8px 4px 8px;font-size:0.85em;color:#555">
                 Wind: {" &nbsp;|&nbsp; ".join(f"<b>{w['name']}</b> {w['avg']:.0f} (g{w['gust_max']:.0f})" for w in day["wind_windows"])}
             </td>
         </tr>
-        <tr>
-            <td colspan="7" style="padding:2px 8px 8px 8px;font-size:0.85em;color:#666;border-bottom:1px solid #eee">
+        <tr class="day-detail">
+            <td colspan="7" style="padding:2px 8px 14px 8px;font-size:0.85em;color:#666">
                 Wind:{cs['wind']} | Gusts:{cs['gusts']} | Precip:{cs['precip']} | Cloud:{cs['cloud']} | Temp:{cs['temp']} | Dir:{cs['direction']}
             </td>
         </tr>""")
@@ -376,9 +376,71 @@ def format_report(scored_days):
     best_date_str = best["date"].strftime("%A, %b %d")
     html = f"""<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"></head>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M50 10 L50 80 L20 80 Z' fill='%231565c0'/><path d='M50 20 L50 70 L75 70 Z' fill='%2342a5f5'/><path d='M15 82 L85 82 Q90 90 80 90 L20 90 Q10 90 15 82Z' fill='%23333'/></svg>">
+<style>
+  .forecast-wrap {{ overflow-x: auto; -webkit-overflow-scrolling: touch; }}
+  @media screen and (max-width: 600px) {{
+    body {{ padding: 0 12px !important; font-size: 16px !important; }}
+    h2 {{ font-size: 1.3em; }}
+
+    .day-header {{ display: none; }}
+
+    .forecast-wrap {{ overflow-x: visible; }}
+    table {{ width: 100% !important; }}
+
+    .day-row {{
+      display: flex;
+      flex-wrap: wrap;
+      position: relative;
+      border-top: 2px solid #ddd;
+      padding: 16px 0 8px 0;
+      margin-top: 4px;
+    }}
+    .day-row td {{
+      display: block;
+      padding: 2px 0 !important;
+      text-align: left !important;
+    }}
+    .day-name {{
+      width: 100%;
+      font-size: 1.15em !important;
+      padding: 0 0 4px 0 !important;
+    }}
+    .day-rating {{
+      position: absolute;
+      top: 14px;
+      right: 0;
+      padding: 0 !important;
+    }}
+    .day-wind {{
+      width: 100%;
+      margin-top: 10px !important;
+      padding: 4px 0 3px 0 !important;
+      order: 1;
+    }}
+    .day-temp {{ width: 50%; padding: 3px 0 !important; order: 2; }}
+    .day-cloud {{ width: 50%; padding: 3px 0 !important; order: 3; }}
+    .day-dir {{ width: 50%; padding: 3px 0 !important; order: 4; }}
+    .day-rain {{ width: 50%; padding: 3px 0 !important; order: 5; }}
+    .day-wind::before {{ content: "Wind: "; font-weight: bold; color: #555; }}
+    .day-dir::before {{ content: "Dir: "; font-weight: bold; color: #555; }}
+    .day-temp::before {{ content: "Temp: "; font-weight: bold; color: #555; }}
+    .day-cloud::before {{ content: "Cloud: "; font-weight: bold; color: #555; }}
+    .day-rain::before {{ content: "Rain: "; font-weight: bold; color: #555; }}
+
+    .day-detail td {{
+      display: block;
+      padding: 2px 0 !important;
+      font-size: 0.85em !important;
+    }}
+  }}
+</style>
+</head>
 <body style="font-family:Arial,Helvetica,sans-serif;max-width:700px;margin:0 auto;color:#333">
-    <h2 style="color:#1565c0">Fern Ridge Sailing Forecast</h2>
+    <h2 style="color:#1565c0"><img src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M50 10 L50 80 L20 80 Z' fill='%231565c0'/><path d='M50 20 L50 70 L75 70 Z' fill='%2342a5f5'/><path d='M15 82 L85 82 Q90 90 80 90 L20 90 Q10 90 15 82Z' fill='%23333'/></svg>" alt="" style="width:1.2em;height:1.2em;vertical-align:middle;margin-right:6px">Fern Ridge Sailing Forecast</h2>
     <p style="color:#666">{now.strftime('%A, %B %d, %Y')}</p>
 
     <div style="background:#e3f2fd;padding:12px 16px;border-radius:6px;margin:16px 0">
@@ -386,8 +448,9 @@ def format_report(scored_days):
         — Score {best['score']} ({best['rating']})
     </div>
 
+    <div class="forecast-wrap">
     <table style="width:100%;border-collapse:collapse;font-size:0.95em">
-        <tr style="background:#f5f5f5">
+        <tr class="day-header" style="background:#f5f5f5">
             <th style="padding:8px;text-align:left">Day</th>
             <th style="padding:8px;text-align:center">Rating</th>
             <th style="padding:8px;text-align:left">Wind</th>
@@ -398,6 +461,7 @@ def format_report(scored_days):
         </tr>
         {"".join(html_rows)}
     </table>
+    </div>
 
     <p style="font-size:0.8em;color:#999;margin-top:20px">
         Scoring: Wind 35% | Gusts 20% | Precip 15% | Cloud 10% | Temp 10% | Direction 10%<br>
