@@ -377,6 +377,13 @@ def format_report(scored_days):
         </table>
     </div>""")
 
+    today = scored_days[0]
+    cond_cloud = today["cloud_avg"]
+    cond_wind = today["wind_avg"]
+    cond_gust = today["gust_max"]
+    cond_precip = today["precip_total"]
+    cond_temp = today["temp_avg"]
+
     best_date_str = best["date"].strftime("%A, %b %d")
     html = f"""<!DOCTYPE html>
 <html>
@@ -437,7 +444,7 @@ def format_report(scored_days):
   }}
 </style>
 </head>
-<body style="font-family:Arial,Helvetica,sans-serif;margin:0;color:#333;background:#42a5f5">
+<body style="font-family:Arial,Helvetica,sans-serif;margin:0;color:#333;background:{'#90a4ae' if cond_precip > 0.1 else '#b0bec5' if cond_cloud > 70 else '#90caf9' if cond_cloud > 40 else '#42a5f5'}">
     <canvas id="bg-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0"></canvas>
     <div style="position:relative;z-index:1;max-width:700px;margin:0 auto;padding:0 12px">
     <div style="text-align:center;padding:28px 0 144px 0">
@@ -446,6 +453,10 @@ def format_report(scored_days):
     </div>
     <script>
     (function() {{
+      var wx = {{ cloud: {cond_cloud:.0f}, wind: {cond_wind:.1f}, gust: {cond_gust:.1f}, precip: {cond_precip:.2f}, temp: {cond_temp:.1f} }};
+      if (new URLSearchParams(window.location.search).get('random') === 'true') {{
+        wx = {{ cloud: Math.random()*100, wind: Math.random()*30, gust: Math.random()*45, precip: Math.random() < 0.3 ? 0.1 + Math.random()*0.4 : 0, temp: 45+Math.random()*35 }};
+      }}
       var c = document.getElementById('bg-canvas');
       var ctx = c.getContext('2d');
       var dpr = window.devicePixelRatio || 1;
@@ -460,26 +471,49 @@ def format_report(scored_days):
       resize();
       window.addEventListener('resize', resize);
 
+      var cloudFrac = wx.cloud / 100;
+      var windFactor = Math.min(wx.wind / 20, 1);
+      var isRainy = wx.precip > 0.1;
+
       function makeCloud() {{
         var numPuffs = 3 + Math.floor(Math.random() * 4);
+        if (cloudFrac > 0.7) numPuffs += 2;
         var puffs = [];
         for (var i = 0; i < numPuffs; i++) {{
           puffs.push([
-            (i - numPuffs/2) * (20 + Math.random()*15),
+            (i - numPuffs/2) * (18 + Math.random()*14),
             (Math.random() - 0.5) * 25,
-            15 + Math.random() * 22
+            15 + Math.random() * 22 + (cloudFrac > 0.5 ? 5 : 0)
           ]);
         }}
         return {{
           x: Math.random() * 900 - 100,
-          y: 15 + Math.random() * 80,
-          s: 0.5 + Math.random() * 0.8,
-          speed: 4 + Math.random() * 12,
-          puffs: puffs
+          y: 10 + Math.random() * 90,
+          s: 0.5 + Math.random() * 0.8 + cloudFrac * 0.3,
+          speed: 3 + Math.random() * 8 + windFactor * 10,
+          puffs: puffs,
+          color: ''
         }};
       }}
+      var numClouds = Math.max(2, Math.round(3 + cloudFrac * 6 + Math.random()*2));
       var clouds = [];
-      for (var ci = 0; ci < 5 + Math.floor(Math.random()*3); ci++) clouds.push(makeCloud());
+      for (var ci = 0; ci < numClouds; ci++) clouds.push(makeCloud());
+      clouds.sort(function(a, b) {{ return a.y - b.y; }});
+      for (var ci = 0; ci < clouds.length; ci++) {{
+        var frac = clouds.length > 1 ? ci / (clouds.length - 1) : 1;
+        var lo = isRainy ? 170 : (cloudFrac > 0.7 ? 205 : 230);
+        var hi = isRainy ? 210 : (cloudFrac > 0.7 ? 240 : 255);
+        var shade = Math.round(lo + frac * (hi - lo));
+        clouds[ci].color = 'rgb(' + shade + ',' + shade + ',' + shade + ')';
+      }}
+
+      var rainDrops = [];
+      if (isRainy) {{
+        var numDrops = Math.round(80 + wx.precip * 400);
+        for (var ri = 0; ri < numDrops; ri++) {{
+          rainDrops.push({{ x: Math.random() * 2000, y: Math.random() * 600, len: 8 + Math.random() * 14, speed: 300 + Math.random() * 200 }});
+        }}
+      }}
 
       var t = 0;
       function draw() {{
@@ -487,10 +521,26 @@ def format_report(scored_days):
         ctx.clearRect(0, 0, W, H);
 
         var sky = ctx.createLinearGradient(0, 0, 0, H);
-        sky.addColorStop(0, '#64b5f6');
-        sky.addColorStop(0.3, '#90caf9');
-        sky.addColorStop(0.6, '#bbdefb');
-        sky.addColorStop(1, '#e3f2fd');
+        if (isRainy) {{
+          sky.addColorStop(0, '#78909c');
+          sky.addColorStop(0.4, '#90a4ae');
+          sky.addColorStop(1, '#b0bec5');
+        }} else if (cloudFrac > 0.7) {{
+          sky.addColorStop(0, '#90a4ae');
+          sky.addColorStop(0.3, '#b0bec5');
+          sky.addColorStop(0.6, '#cfd8dc');
+          sky.addColorStop(1, '#eceff1');
+        }} else if (cloudFrac > 0.4) {{
+          sky.addColorStop(0, '#64b5f6');
+          sky.addColorStop(0.3, '#90caf9');
+          sky.addColorStop(0.6, '#bbdefb');
+          sky.addColorStop(1, '#e3f2fd');
+        }} else {{
+          sky.addColorStop(0, '#1976d2');
+          sky.addColorStop(0.3, '#42a5f5');
+          sky.addColorStop(0.6, '#90caf9');
+          sky.addColorStop(1, '#bbdefb');
+        }}
         ctx.fillStyle = sky;
         ctx.fillRect(0, 0, W, H);
 
@@ -501,7 +551,7 @@ def format_report(scored_days):
           ctx.save();
           ctx.translate(cl.x, cl.y);
           ctx.scale(cl.s, cl.s);
-          ctx.fillStyle = '#ffffff';
+          ctx.fillStyle = cl.color;
           for (var p = 0; p < cl.puffs.length; p++) {{
             ctx.beginPath();
             ctx.arc(cl.puffs[p][0], cl.puffs[p][1], cl.puffs[p][2], 0, Math.PI*2);
@@ -510,11 +560,13 @@ def format_report(scored_days):
           ctx.restore();
         }}
 
+        var waveAmpScale = 0.5 + windFactor * 1.0;
+        var waveSpeedScale = 0.6 + windFactor * 0.8;
         function drawWaveLayer(idx) {{
-          var waterColors = ['#1565c0','#0d47a1','#0a3d91'];
-          var amp = 8 - idx * 1.5;
+          var waterColors = isRainy ? ['#37474f','#263238','#1a2327'] : ['#1565c0','#0d47a1','#0a3d91'];
+          var amp = (8 - idx * 1.5) * waveAmpScale;
           var yBase = 185 + idx * 12;
-          var speed = 1 + idx * 0.4;
+          var speed = (1 + idx * 0.4) * waveSpeedScale;
           ctx.fillStyle = waterColors[idx];
           ctx.beginPath();
           ctx.moveTo(0, H);
@@ -527,7 +579,9 @@ def format_report(scored_days):
         }}
 
         function waveY(x) {{
-          return 197 + Math.sin(x*0.015 + t*1.4)*6.5 + Math.sin(x*0.008 + t*0.84)*3.25;
+          var a = 6.5 * waveAmpScale;
+          var s = 1.4 * waveSpeedScale;
+          return 197 + Math.sin(x*0.015 + t*s)*a + Math.sin(x*0.008 + t*s*0.6)*a*0.5;
         }}
 
         function drawBoat() {{
@@ -578,6 +632,24 @@ def format_report(scored_days):
         drawWaveLayer(0);
         drawBoat();
         drawWaveLayer(1);
+
+        if (isRainy) {{
+          var windAngle = windFactor * 2;
+          ctx.strokeStyle = 'rgba(200,210,220,0.4)';
+          ctx.lineWidth = 1;
+          for (var ri = 0; ri < rainDrops.length; ri++) {{
+            var rd = rainDrops[ri];
+            rd.y += rd.speed * 0.016;
+            rd.x += windAngle * rd.speed * 0.008;
+            if (rd.y > H) {{ rd.y = -rd.len; rd.x = Math.random() * W; }}
+            if (rd.x > W) rd.x -= W;
+            ctx.beginPath();
+            ctx.moveTo(rd.x, rd.y);
+            ctx.lineTo(rd.x + windAngle * rd.len * 0.3, rd.y + rd.len);
+            ctx.stroke();
+          }}
+        }}
+
         drawWaveLayer(2);
 
         requestAnimationFrame(draw);
