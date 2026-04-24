@@ -1086,7 +1086,12 @@ def format_report(scored_days):
         if (dbg) {{
           var qs = '?cloud=' + wx.cloud.toFixed(0) + '&wind=' + wx.wind.toFixed(1) + '&gust=' + wx.gust.toFixed(1) + '&precip=' + wx.precip.toFixed(2) + '&temp=' + wx.temp.toFixed(1);
           if (activeEffects.length) qs += '&effects=' + activeEffects.join(',');
-          dbg.textContent = qs;
+          dbg.textContent = qs + ' ';
+          var rlink = document.createElement('a');
+          rlink.href = '?random=true';
+          rlink.textContent = 'Randomize';
+          rlink.style.color = 'rgba(255,255,255,0.45)';
+          dbg.appendChild(rlink);
         }}
       }});
     }})();
