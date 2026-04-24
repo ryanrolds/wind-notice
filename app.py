@@ -241,6 +241,16 @@ def create_app():
             '</body></html>'
         )
 
+    @app.route("/robots.txt")
+    def robots():
+        body = (
+            "User-agent: *\n"
+            "Allow: /\n"
+            "Disallow: /healthz\n"
+            "Disallow: /simulation\n"
+        )
+        return body, 200, {"Content-Type": "text/plain; charset=utf-8"}
+
     @app.route("/healthz")
     def health():
         with _report_lock:

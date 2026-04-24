@@ -2,6 +2,7 @@
 """Fern Ridge Sailing Forecast - 7-day forecast scored for sailing quality."""
 
 import argparse
+import hashlib
 import logging
 import os
 import random
@@ -315,13 +316,30 @@ def get_score_color(score):
         return "#b71c1c"  # red
 
 
+def _compute_simulation_js_version():
+    """Hash static/simulation.js for cache busting. Computed once at import."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "simulation.js")
+    try:
+        with open(path, "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()[:12]
+    except OSError:
+        return ""
+
+
+_SIMULATION_JS_VERSION = _compute_simulation_js_version()
+
+
 def _simulation_block(cond_cloud, cond_wind, cond_gust, cond_precip, cond_temp, cond_weather_code):
     """Return the <canvas> + simulation bootstrap for inclusion in a page.
 
     The heavy simulation JS lives in static/simulation.js so browsers can
     cache it; here we just emit the canvas, inject initial weather values as
-    a small global, and load the external script.
+    a small global, and load the external script. The script URL carries a
+    content-hash query string so browsers re-fetch it when the file changes.
     """
+    src = "/static/simulation.js"
+    if _SIMULATION_JS_VERSION:
+        src += "?v=" + _SIMULATION_JS_VERSION
     return (
         '    <canvas id="bg-canvas" style="position:fixed;top:0;left:0;'
         'width:100%;height:100%;z-index:0"></canvas>\n'
@@ -330,7 +348,7 @@ def _simulation_block(cond_cloud, cond_wind, cond_gust, cond_precip, cond_temp, 
         f'"gust": {cond_gust:.1f}, "precip": {cond_precip:.2f}, '
         f'"temp": {cond_temp:.1f}, "weather_code": {cond_weather_code}'
         '};</script>\n'
-        '    <script src="/static/simulation.js"></script>'
+        f'    <script src="{src}"></script>'
     )
 
 

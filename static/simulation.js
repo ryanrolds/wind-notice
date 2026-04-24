@@ -236,6 +236,15 @@
         return '#'+((1<<24)|(r<<16)|(g<<8)|bl).toString(16).slice(1);
       }
 
+      // Bird scheduling state. First appearance is random 20-60s after load so
+      // the bird never shows up at t=0 mid-flight, and it always enters from
+      // off the left/right edge rather than popping into view on screen.
+      var birdCrossDur = 28;  // seconds to cross (slower than before)
+      var birdInFlight = false;
+      var birdStartAt = 0;
+      var birdDirection = Math.random() < 0.5 ? 1 : -1;
+      var nextBirdAt = 20 + Math.random() * 40;
+
       var t = 0;
       function draw() {
         t += 0.016;
@@ -326,34 +335,45 @@
         }
 
         // --- Bird ---
-        // A distant seagull silhouette. Each cycle the bird crosses the sky
-        // once then stays off-screen for the remainder, so appearances are
-        // infrequent. Suppressed in heavy precip / storm conditions.
-        var birdCycle = 55 - windFactor * 15; // seconds between appearances
-        var birdVisibleFrac = 0.22;           // fraction of cycle the bird is visible
-        var cyclePhase = ((t + 3) % birdCycle) / birdCycle;
-        if (!isStormy && !hasEffect('heavyrain') && !hasEffect('hail') && cyclePhase < birdVisibleFrac) {
-          var birdPhase = cyclePhase / birdVisibleFrac; // 0..1 across the screen
-          var bx = -40 + birdPhase * (W + 80);
-          // Sit closer to the horizon to read as distant (atmospheric perspective).
-          var bobY = Math.max(60, horizon * 0.55);
-          var by = bobY + Math.sin(t * 0.9) * 5 + Math.sin(t * 0.4) * 3;
-          var flap = 0.55 + Math.sin(t * 7.5) * 0.45; // 0..1
-          var wingSpan = 12;
-          var wingDip = 5 * flap;
-          ctx.save();
-          ctx.strokeStyle = isFoggy ? 'rgba(110,118,130,0.4)' : 'rgba(60,70,85,0.55)';
-          ctx.lineWidth = 1.3;
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          ctx.beginPath();
-          // Left wing arc
-          ctx.moveTo(bx - wingSpan, by);
-          ctx.quadraticCurveTo(bx - wingSpan * 0.5, by - wingDip, bx, by);
-          // Right wing arc
-          ctx.quadraticCurveTo(bx + wingSpan * 0.5, by - wingDip, bx + wingSpan, by);
-          ctx.stroke();
-          ctx.restore();
+        // Distant seagull silhouette, scheduled with random gaps between
+        // appearances. Always enters from off-screen; never visible at load
+        // time. Suppressed in heavy precip / storm conditions.
+        var birdAllowed = !isStormy && !hasEffect('heavyrain') && !hasEffect('hail');
+        if (birdAllowed) {
+          if (!birdInFlight && t >= nextBirdAt) {
+            birdInFlight = true;
+            birdStartAt = t;
+            birdDirection = Math.random() < 0.5 ? 1 : -1;
+          }
+          if (birdInFlight) {
+            var elapsed = t - birdStartAt;
+            if (elapsed >= birdCrossDur) {
+              birdInFlight = false;
+              // 45-120s quiet gap before the next bird.
+              nextBirdAt = t + 45 + Math.random() * 75;
+            } else {
+              var birdPhase = elapsed / birdCrossDur; // 0..1
+              var bx = birdDirection === 1
+                ? -40 + birdPhase * (W + 80)
+                : (W + 40) - birdPhase * (W + 80);
+              var bobY = Math.max(60, horizon * 0.55);
+              var by = bobY + Math.sin(t * 0.9) * 5 + Math.sin(t * 0.4) * 3;
+              var flap = 0.55 + Math.sin(t * 7.5) * 0.45;
+              var wingSpan = 12;
+              var wingDip = 5 * flap;
+              ctx.save();
+              ctx.strokeStyle = isFoggy ? 'rgba(110,118,130,0.4)' : 'rgba(60,70,85,0.55)';
+              ctx.lineWidth = 1.3;
+              ctx.lineCap = 'round';
+              ctx.lineJoin = 'round';
+              ctx.beginPath();
+              ctx.moveTo(bx - wingSpan, by);
+              ctx.quadraticCurveTo(bx - wingSpan * 0.5, by - wingDip, bx, by);
+              ctx.quadraticCurveTo(bx + wingSpan * 0.5, by - wingDip, bx + wingSpan, by);
+              ctx.stroke();
+              ctx.restore();
+            }
+          }
         }
 
         // --- Lightning bolts ---
@@ -683,4 +703,3 @@
         }
       });
     })();
-    
