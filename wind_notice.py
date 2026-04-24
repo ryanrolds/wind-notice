@@ -414,6 +414,10 @@ def format_report(scored_days):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:title" content="Fern Ridge Sailing Forecast — {now.strftime('%b %d, %Y')}">
+<meta property="og:description" content="Best day: {best_date_str} — Score {best['score']} ({best['rating']}). Wind {cond_wind:.0f} mph, gusts {cond_gust:.0f} mph, {cond_cloud:.0f}% cloud cover.">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_US">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M0 80 Q15 75 30 80 Q45 85 60 80 Q75 75 90 80 Q95 82 100 80 L100 100 L0 100Z' fill='%231565c0'/><path d='M0 88 Q20 83 40 88 Q60 93 80 88 Q90 85 100 88 L100 100 L0 100Z' fill='%230d47a1'/><path d='M50 10 L50 80 L20 80 Z' fill='%232196f3'/><path d='M50 20 L50 70 L75 70 Z' fill='%2364b5f6'/><path d='M15 82 L85 82 Q90 90 80 90 L20 90 Q10 90 15 82Z' fill='%23e53935'/></svg>">
 <style>
   @media screen and (max-width: 600px) {{
@@ -658,7 +662,7 @@ def format_report(scored_days):
         if (!hasEffect('hail')) return;
         var numStones = Math.round(30 + Math.random() * 20);
         for (var i = 0; i < numStones; i++) {{
-          hailStones.push({{ x: Math.random() * W, y: Math.random() * H, r: 2 + Math.random() * 3, vy: 200 + Math.random() * 150, vx: 0, bouncing: false }});
+          hailStones.push({{ x: Math.random() * W, y: Math.random() * 210 - 15, r: 2 + Math.random() * 3, vy: 200 + Math.random() * 150, vx: 0, bouncing: false }});
         }}
       }}
       initHail();

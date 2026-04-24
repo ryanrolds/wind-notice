@@ -17,6 +17,26 @@ Ratings: Excellent (80+), Good (65–79), Fair (50–64), Poor (35–49), Unfavo
 
 Wind and temperature have hard cutoffs — if either is outside the usable range, the day is capped at Unfavorable regardless of other conditions.
 
+## Weather Simulation
+
+The forecast page includes an animated canvas simulation that visualizes current conditions — sky color, clouds, sun, waves, and weather effects (rain, snow, hail, fog, lightning). The simulation responds to actual forecast data.
+
+### URL Parameters
+
+- `?random=true` — randomize all weather values and effects
+- `?cloud=50&wind=12&gust=18&precip=0.10&temp=65&effects=rain,fog` — override specific values
+
+The current simulation parameters are displayed at the bottom of the page as a copyable query string.
+
+| Parameter | Range | Unit |
+|-----------|-------|------|
+| `cloud` | 0–100 | % |
+| `wind` | 0–30 | mph |
+| `gust` | 0–45 | mph |
+| `precip` | 0–0.5 | inches |
+| `temp` | 45–80 | °F |
+| `effects` | comma-separated | `lightning`, `hail`, `snow`, `fog`, `drizzle`, `heavyrain`, `freezingrain`, `rain` |
+
 ## Local Development
 
 ```bash
